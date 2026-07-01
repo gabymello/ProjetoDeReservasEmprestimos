@@ -1,4 +1,4 @@
-# API de Recursos
+# API de Recursos — `sistema_reservas`
 
 Base URL: `/api/recursos.php`
 
@@ -6,27 +6,37 @@ Todas as respostas são em JSON (`Content-Type: application/json`).
 
 ---
 
-## Listar todos
+## Listar recursos
 
 ```
 GET /api/recursos.php
 ```
 
+**Filtros opcionais (querystring):**
+| Parâmetro   | Exemplo              | Descrição                         |
+|-------------|-----------------------|---------------------------------------|
+| categoria   | `?categoria=1`         | filtra por `id_categoria`             |
+| setor       | `?setor=2`             | filtra por `id_setor`                 |
+| status      | `?status=Disponível`   | filtra por status exato               |
+
+Os filtros podem ser combinados: `?categoria=1&status=Disponível`
+
 **Resposta 200**
 ```json
 {
-  "total": 2,
+  "total": 1,
   "dados": [
     {
       "id": 1,
-      "nome": "Notebook Dell Latitude",
-      "descricao": "Uso do setor de TI",
-      "categoria": { "id": 2, "nome": "Software" },
-      "setor": { "id": 2, "nome": "TI" },
+      "nome": "Projetor Epson PowerLite",
+      "descricao": "Projetor multimídia full HD",
+      "categoria": { "id": 1, "nome": "Audiovisual" },
+      "setor": { "id": 1, "nome": "TI" },
+      "status": "Disponível",
+      "localizacao": "Sala de TI",
       "foto": "recurso_65123abc.jpg",
       "foto_url": "http://seusite.com/uploads/recurso_65123abc.jpg",
-      "criado_em": "2026-06-30 10:00:00",
-      "atualizado_em": "2026-06-30 10:00:00"
+      "data_cadastro": "2026-07-01"
     }
   ]
 }
@@ -53,21 +63,29 @@ Content-Type: multipart/form-data   (use isso se for enviar foto)
 ```
 
 **Campos:**
-| Campo         | Tipo    | Obrigatório |
-|---------------|---------|-------------|
-| nome          | string  | sim         |
-| descricao     | string  | não         |
-| categoria_id  | int     | não         |
-| setor_id      | int     | não         |
-| foto          | arquivo | não         |
+| Campo         | Tipo    | Obrigatório | Observação                                      |
+|---------------|---------|-------------|----------------------------------------------------|
+| nome          | string  | sim         |                                                      |
+| descricao     | string  | não         |                                                      |
+| id_categoria  | int     | sim         | precisa existir em `categoria`                       |
+| id_setor      | int     | sim         | precisa existir em `setor`                            |
+| status        | string  | sim         | um de: `Disponível`, `Em uso`, `Manutenção`, `Inativo` |
+| localizacao   | string  | não         |                                                      |
+| foto          | arquivo | não         |                                                      |
 
 Também aceita `Content-Type: application/json` quando não há upload de foto:
 ```json
-{ "nome": "Impressora HP", "categoria_id": 1, "setor_id": 3 }
+{
+  "nome": "Impressora HP",
+  "id_categoria": 2,
+  "id_setor": 1,
+  "status": "Disponível",
+  "localizacao": "Sala 05"
+}
 ```
 
 **Resposta 201** → `{ "mensagem": "Recurso criado.", "dado": { ... } }`
-**Resposta 422** → `{ "erro": "O campo \"nome\" é obrigatório." }`
+**Resposta 422** → `{ "erro": "O campo \"id_categoria\" é obrigatório." }`
 
 ---
 
@@ -78,7 +96,7 @@ Também aceita `Content-Type: application/json` quando não há upload de foto:
 PUT /api/recursos.php?id=1
 Content-Type: application/json
 
-{ "nome": "Novo nome", "setor_id": null }
+{ "status": "Em uso", "localizacao": "Sala 08" }
 ```
 
 **Com foto (multipart, use override de método):**
@@ -90,7 +108,8 @@ _method=PUT
 nome=Novo nome
 foto=(arquivo)
 ```
-> PHP não processa `multipart/form-data` em requisições `PUT` nativas — por isso, para trocar a foto, envie via `POST` com o campo `_method=PUT`.
+> PHP não processa `multipart/form-data` em requisições `PUT` nativas — por
+> isso, para trocar a foto, envie via `POST` com o campo `_method=PUT`.
 
 **Resposta 200** → `{ "mensagem": "Recurso atualizado.", "dado": { ... } }`
 
@@ -104,6 +123,37 @@ DELETE /api/recursos.php?id=1
 
 **Resposta 200** → `{ "mensagem": "Recurso excluído com sucesso." }`
 **Resposta 404** → `{ "erro": "Recurso não encontrado." }`
+**Resposta 409** → `{ "erro": "Não é possível excluir: existem registros de histórico de uso vinculados a este recurso." }`
+> Isso acontece porque `historico_uso.id_recurso` é uma FK sem
+> `ON DELETE CASCADE` — o banco protege o histórico contra exclusões.
+
+---
+
+## Exemplos com cURL
+
+```bash
+# Listar todos
+curl http://localhost:8000/api/recursos.php
+
+# Listar apenas disponíveis do setor 1
+curl "http://localhost:8000/api/recursos.php?setor=1&status=Disponível"
+
+# Criar (com foto)
+curl -X POST http://localhost:8000/api/recursos.php \
+  -F "nome=Cadeira Gamer" \
+  -F "id_categoria=3" \
+  -F "id_setor=2" \
+  -F "status=Disponível" \
+  -F "foto=@/caminho/para/imagem.jpg"
+
+# Atualizar status (sem foto)
+curl -X PUT http://localhost:8000/api/recursos.php?id=1 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"Manutenção"}'
+
+# Excluir
+curl -X DELETE http://localhost:8000/api/recursos.php?id=1
+```
 
 ---
 
@@ -114,10 +164,12 @@ DELETE /api/recursos.php?id=1
 implementation("com.squareup.retrofit2:retrofit:2.11.0")
 implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 implementation("com.squareup.okhttp3:okhttp:4.12.0")
+implementation("io.coil-kt:coil:2.6.0") // para carregar a foto
 ```
 
-> No `AndroidManifest.xml`, se a API estiver em HTTP (sem SSL) durante testes locais,
-> adicione `android:usesCleartextTraffic="true"` na tag `<application>`.
+> No `AndroidManifest.xml`, se a API estiver em HTTP (sem SSL) durante
+> testes locais, adicione `android:usesCleartextTraffic="true"` na tag
+> `<application>`.
 
 **2. Modelos de dados:**
 ```kotlin
@@ -130,21 +182,28 @@ data class Recurso(
     val id: Int,
     val nome: String,
     val descricao: String?,
-    val categoria: Categoria?,
-    val setor: Setor?,
+    val categoria: Categoria,
+    val setor: Setor,
+    val status: String,
+    val localizacao: String?,
     val foto: String?,
-    val foto_url: String?
+    val foto_url: String?,
+    val data_cadastro: String?
 )
 
-data class Categoria(val id: Int?, val nome: String?)
-data class Setor(val id: Int?, val nome: String?)
+data class Categoria(val id: Int, val nome: String?)
+data class Setor(val id: Int, val nome: String?)
 ```
 
 **3. Interface Retrofit:**
 ```kotlin
 interface RecursoApi {
     @GET("api/recursos.php")
-    suspend fun listar(): RecursoResponse
+    suspend fun listar(
+        @Query("categoria") categoriaId: Int? = null,
+        @Query("setor") setorId: Int? = null,
+        @Query("status") status: String? = null
+    ): RecursoResponse
 
     @GET("api/recursos.php")
     suspend fun buscar(@Query("id") id: Int): Map<String, Recurso>
@@ -168,8 +227,7 @@ val api = retrofit.create(RecursoApi::class.java)
 ```kotlin
 lifecycleScope.launch {
     try {
-        val resposta = api.listar()
-        // resposta.dados -> lista pronta para popular um RecyclerView
+        val resposta = api.listar(status = "Disponível")
         adapter.submitList(resposta.dados)
     } catch (e: Exception) {
         Log.e("API", "Erro ao buscar recursos", e)
@@ -177,32 +235,16 @@ lifecycleScope.launch {
 }
 ```
 
-**Observações importantes para o Android:**
-- Se estiver testando no **emulador**, use `http://10.0.2.2/...` como base URL (esse IP aponta para o `localhost` da sua máquina dentro do emulador).
-- Se estiver testando em **celular físico** na mesma rede Wi-Fi, use o IP local do seu computador (ex.: `http://192.168.0.10/...`).
-- Para exibir a foto (`foto_url`) num `ImageView`, use uma lib como Coil ou Glide:
-  ```kotlin
-  implementation("io.coil-kt:coil:2.6.0")
-  imageView.load(recurso.foto_url)
-  ```
-
-
-
-```bash
-# Listar
-curl http://localhost:8000/api/recursos.php
-
-# Criar (com foto)
-curl -X POST http://localhost:8000/api/recursos.php \
-  -F "nome=Cadeira Gamer" \
-  -F "categoria_id=1" \
-  -F "foto=@/caminho/para/imagem.jpg"
-
-# Atualizar (sem foto)
-curl -X PUT http://localhost:8000/api/recursos.php?id=1 \
-  -H "Content-Type: application/json" \
-  -d '{"nome":"Cadeira Ergonômica"}'
-
-# Excluir
-curl -X DELETE http://localhost:8000/api/recursos.php?id=1
+**6. Exibindo a foto num `ImageView`:**
+```kotlin
+imageView.load(recurso.foto_url) {
+    placeholder(R.drawable.placeholder_recurso)
+    error(R.drawable.placeholder_recurso)
+}
 ```
+
+**Observações importantes para o Android:**
+- **Emulador Android** → use `http://10.0.2.2/...` como base URL
+- **Celular físico na mesma rede Wi-Fi** → use o IP local do computador (ex.: `http://192.168.0.10/...`)
+- O campo `status` deve ser enviado exatamente como está no banco
+  (`Disponível`, `Em uso`, `Manutenção`, `Inativo`), incluindo acentuação

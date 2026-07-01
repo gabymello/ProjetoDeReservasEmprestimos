@@ -5,7 +5,7 @@
  */
 
 $DB_HOST = 'localhost';
-$DB_NAME = 'crud_recursos';
+$DB_NAME = 'sistema_reservas';
 $DB_USER = 'root';
 $DB_PASS = '';
 

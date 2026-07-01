@@ -6,6 +6,9 @@
 define('UPLOAD_DIR', __DIR__ . '/../uploads/');
 define('UPLOAD_URL', 'uploads/');
 
+/** Status possíveis do recurso (mesmo ENUM da tabela `recurso`) */
+const STATUS_RECURSO = ['Disponível', 'Em uso', 'Manutenção', 'Inativo'];
+
 /**
  * Trata o upload de uma imagem de forma segura.
  *
@@ -73,4 +76,18 @@ function removerFoto(?string $nomeArquivo): void
 function e(?string $valor): string
 {
     return htmlspecialchars($valor ?? '', ENT_QUOTES, 'UTF-8');
+}
+
+/**
+ * Retorna a classe CSS de badge de acordo com o status do recurso.
+ */
+function statusBadgeClass(string $status): string
+{
+    return match ($status) {
+        'Disponível' => 'badge-status badge-status--disponivel',
+        'Em uso'     => 'badge-status badge-status--em-uso',
+        'Manutenção' => 'badge-status badge-status--manutencao',
+        'Inativo'    => 'badge-status badge-status--inativo',
+        default      => 'badge-status',
+    };
 }
