@@ -1,8 +1,12 @@
-# Gestão de Recursos — CRUD + API JSON
+# Sistema de Reservas — CRUD de Recursos + API JSON
 
-Sistema de cadastro de recursos (nome, descrição, categoria, setor e foto),
-com um CRUD web completo em PHP e uma API JSON para consumo externo
-(ex.: aplicativo Android).
+CRUD completo em PHP para a tabela `recurso` do banco `sistema_reservas`,
+com upload de imagem, filtros, chaves estrangeiras para `categoria` e
+`setor`, e uma API JSON para consumo externo (ex.: aplicativo Android).
+
+Este projeto foi construído em cima do dump `sistema_reservas.sql`
+fornecido (incluído na raiz do projeto), respeitando exatamente os nomes
+de tabelas e colunas já existentes.
 
 ---
 
@@ -23,7 +27,7 @@ com um CRUD web completo em PHP e uma API JSON para consumo externo
 ## Requisitos
 
 - PHP 8.0 ou superior, com extensões `pdo_mysql` e `fileinfo` habilitadas
-- MySQL 5.7+ ou MariaDB equivalente
+- MySQL 5.7+ ou MariaDB (o dump original foi gerado em MariaDB 10.4)
 - Servidor web (Apache, Nginx ou o servidor embutido do PHP)
 
 ---
@@ -31,36 +35,41 @@ com um CRUD web completo em PHP e uma API JSON para consumo externo
 ## Instalação
 
 1. **Banco de dados**
-   Importe o arquivo `database.sql` no seu MySQL:
+   Importe o dump original (que já contém as tabelas `categoria`, `setor`,
+   `recurso`, `historico_uso` e `usuario`):
    ```bash
-   mysql -u root -p < database.sql
+   mysql -u root -p < sistema_reservas.sql
    ```
-   Isso cria o banco `crud_recursos`, as tabelas `categorias`, `setores` e
-   `recursos`, além de alguns registros de exemplo.
+
+   Opcionalmente, popule com alguns dados de exemplo:
+   ```bash
+   mysql -u root -p < dados_exemplo.sql
+   ```
+
+   > ⚠️ O CRUD exige que existam **categorias** e **setores** cadastrados
+   > antes de criar um recurso, já que essas colunas são `NOT NULL` na
+   > tabela `recurso`. Se optar por não usar o `dados_exemplo.sql`, insira
+   > manualmente ao menos um registro em `categoria` e outro em `setor`.
 
 2. **Configuração da conexão**
-   Edite `config/database.php` com as credenciais do seu ambiente:
+   Edite `config/database.php`:
    ```php
    $DB_HOST = 'localhost';
-   $DB_NAME = 'crud_recursos';
+   $DB_NAME = 'sistema_reservas';
    $DB_USER = 'root';
    $DB_PASS = '';
    ```
 
 3. **Permissão da pasta de uploads**
-   Garanta que a pasta `uploads/` tenha permissão de escrita:
    ```bash
    chmod 755 uploads
    ```
 
 4. **Subindo o servidor**
-   Para testes rápidos, use o servidor embutido do PHP a partir da raiz do projeto:
    ```bash
    php -S localhost:8000
    ```
    Acesse `http://localhost:8000/index.php`.
-
-   Em produção, aponte o Apache/Nginx para a raiz do projeto normalmente.
 
 ---
 
@@ -69,99 +78,95 @@ com um CRUD web completo em PHP e uma API JSON para consumo externo
 ```
 crud-recursos/
 ├── api/
-│   ├── recursos.php        → API JSON (GET, POST, PUT, DELETE)
-│   └── README.md           → documentação técnica da API + guia Android
+│   ├── recursos.php          → API JSON (GET, POST, PUT, DELETE)
+│   └── README.md             → documentação técnica da API + guia Android
 ├── assets/
-│   └── css/style.css       → estilo visual do sistema
+│   └── css/style.css         → estilo visual do sistema
 ├── config/
-│   └── database.php        → conexão PDO com o MySQL
+│   └── database.php          → conexão PDO com o MySQL
 ├── includes/
-│   ├── header.php          → cabeçalho/menu compartilhado
-│   ├── footer.php          → rodapé compartilhado
-│   └── helpers.php         → upload de imagem, sanitização, funções úteis
-├── uploads/                → fotos enviadas pelos formulários
-├── database.sql            → script de criação do banco
-├── index.php                → listagem de recursos
-├── create.php               → cadastro de recurso
-├── edit.php                 → edição de recurso
-└── delete.php                → exclusão de recurso
+│   ├── header.php            → cabeçalho/menu compartilhado
+│   ├── footer.php            → rodapé compartilhado
+│   └── helpers.php           → upload de imagem, sanitização, status
+├── uploads/                  → fotos enviadas pelos formulários
+├── sistema_reservas.sql      → dump original do banco (fornecido)
+├── dados_exemplo.sql         → dados de exemplo opcionais
+├── index.php                  → listagem de recursos, com filtros
+├── create.php                 → cadastro de recurso
+├── edit.php                   → edição de recurso
+└── delete.php                  → exclusão de recurso
 ```
 
 ---
 
 ## Banco de dados
 
-**Tabela `recursos`**
+O projeto usa as tabelas exatamente como estão no dump enviado. Nenhuma
+tabela foi renomeada ou teve colunas alteradas.
 
-| Campo          | Tipo      | Observação                                   |
-|----------------|-----------|-----------------------------------------------|
-| id             | INT (PK)  | auto incremento                                |
-| nome           | VARCHAR   | obrigatório                                    |
-| descricao      | TEXT      | opcional (nullable)                            |
-| categoria_id   | INT (FK)  | opcional (nullable) → `categorias.id`          |
-| setor_id       | INT (FK)  | opcional (nullable) → `setores.id`             |
-| foto           | VARCHAR   | nome do arquivo salvo em `uploads/` (nullable) |
-| criado_em      | DATETIME  | preenchido automaticamente                     |
-| atualizado_em  | DATETIME  | atualizado automaticamente                     |
+**Tabela `recurso`** (tabela principal deste CRUD)
 
-**Tabelas `categorias` e `setores`**
+| Campo          | Tipo                                                        | Observação                              |
+|----------------|---------------------------------------------------------------|-------------------------------------------|
+| id_recurso     | INT (PK)                                                       | auto incremento                            |
+| nome           | VARCHAR(100)                                                    | obrigatório                                |
+| descricao      | TEXT                                                             | opcional (nullable)                        |
+| id_categoria   | INT (FK → `categoria.id_categoria`)                              | **obrigatório** (NOT NULL no banco)        |
+| id_setor       | INT (FK → `setor.id_setor`)                                       | **obrigatório** (NOT NULL no banco)        |
+| status         | ENUM('Disponível','Em uso','Manutenção','Inativo')                 | padrão: `Disponível`                       |
+| localizacao    | VARCHAR(100)                                                         | opcional (nullable)                        |
+| data_cadastro  | DATE                                                                   | preenchido automaticamente (`curdate()`)   |
+| foto           | VARCHAR(255)                                                            | nome do arquivo salvo em `uploads/`        |
 
-Foram criadas como catálogos simples (`id`, `nome`) porque a estrutura real
-não havia sido definida. Se você já possui essas tabelas em outro lugar do
-seu sistema, edite `database.sql`, apague os blocos `CREATE TABLE categorias`
-/ `CREATE TABLE setores` e ajuste as `FOREIGN KEY` de `recursos` para
-apontarem para as tabelas existentes.
-
-As FKs usam `ON DELETE SET NULL`: se uma categoria ou setor for removido, o
-recurso não é apagado — apenas fica sem categoria/setor definidos.
+**Tabela `categoria`**: `id_categoria`, `nome`, `descricao`
+**Tabela `setor`**: `id_setor`, `nome`, `responsavel`, `telefone`, `email`
+**Tabela `historico_uso`**: referencia `recurso.id_recurso` via FK **sem**
+`ON DELETE CASCADE` — ou seja, se um recurso tiver histórico de uso
+registrado, a exclusão dele será bloqueada pelo banco. O CRUD e a API
+tratam esse erro e avisam o usuário de forma amigável, em vez de quebrar.
+**Tabela `usuario`**: não é usada por este CRUD (fica disponível no banco
+para um sistema de login, se você quiser implementar depois).
 
 ---
 
 ## CRUD Web
 
-Interface web tradicional, acessada pelo navegador:
-
-| Página        | Função                                              |
-|---------------|-------------------------------------------------------|
-| `index.php`   | Lista todos os recursos, com foto, categoria e setor  |
-| `create.php`  | Formulário de cadastro (com upload de foto)           |
-| `edit.php`    | Formulário de edição (trocar/remover foto)            |
-| `delete.php`  | Exclui o recurso e apaga o arquivo de imagem associado |
+| Página        | Função                                                          |
+|---------------|--------------------------------------------------------------------|
+| `index.php`   | Lista recursos, com foto, categoria, setor, status e localização. Possui filtros por categoria, setor e status. |
+| `create.php`  | Formulário de cadastro (categoria, setor e status são obrigatórios; upload de foto opcional) |
+| `edit.php`    | Formulário de edição (trocar/remover foto)                          |
+| `delete.php`  | Exclui o recurso e a imagem associada. Se houver histórico de uso vinculado, a exclusão é bloqueada com aviso na tela. |
 
 O upload de imagem:
 - Aceita JPG, PNG, WEBP e GIF
 - Valida o MIME real do arquivo (não confia apenas na extensão)
 - Limite de 5MB
-- Gera nome de arquivo único (`uniqid`), evitando conflitos
-- Ao editar ou excluir, apaga o arquivo antigo do servidor automaticamente
+- Gera nome de arquivo único (`uniqid`)
+- Apaga o arquivo antigo automaticamente ao editar/excluir/remover foto
 
 ---
 
 ## API JSON
 
-Endpoint principal: `api/recursos.php`. Documentação completa e exemplos de
-`curl` em [`api/README.md`](api/README.md).
+Endpoint principal: `api/recursos.php`. Documentação completa em
+[`api/README.md`](api/README.md).
 
-Resumo dos endpoints:
-
-| Ação                | Método | URL                                             |
-|---------------------|--------|--------------------------------------------------|
-| Listar todos         | GET    | `/api/recursos.php`                              |
-| Buscar um             | GET    | `/api/recursos.php?id=1`                         |
-| Criar                 | POST   | `/api/recursos.php` (multipart p/ foto, ou JSON) |
-| Atualizar sem foto     | PUT    | `/api/recursos.php?id=1` (JSON)                  |
-| Atualizar com foto      | POST   | `/api/recursos.php?id=1` + campo `_method=PUT`   |
-| Excluir                | DELETE | `/api/recursos.php?id=1`                         |
+| Ação                | Método | URL                                                     |
+|---------------------|--------|------------------------------------------------------------|
+| Listar (com filtros)  | GET    | `/api/recursos.php` — aceita `?categoria=1&setor=2&status=Disponível` |
+| Buscar um              | GET    | `/api/recursos.php?id=1`                                 |
+| Criar                   | POST   | `/api/recursos.php` (multipart p/ foto, ou JSON)          |
+| Atualizar sem foto        | PUT    | `/api/recursos.php?id=1` (JSON)                            |
+| Atualizar com foto          | POST   | `/api/recursos.php?id=1` + campo `_method=PUT`             |
+| Excluir                       | DELETE | `/api/recursos.php?id=1`                                    |
 
 A API:
-- Retorna sempre JSON (`Content-Type: application/json`)
-- Já inclui cabeçalhos **CORS** liberados (`Access-Control-Allow-Origin: *`),
-  necessários para que apps externos — como um app Android — consigam
-  consumir os dados sem bloqueio
-- Retorna `foto_url` com a URL completa da imagem, pronta para ser carregada
-  direto num `ImageView` do Android
-- Usa os mesmos códigos HTTP semânticos: `200` (sucesso), `201` (criado),
-  `404` (não encontrado), `422` (validação), `500` (erro interno)
+- Retorna sempre JSON, com cabeçalhos **CORS** liberados — pronta para ser
+  consumida por um app Android sem bloqueio
+- Devolve `foto_url` já como URL completa da imagem
+- Valida obrigatoriedade de `nome`, `id_categoria`, `id_setor` e `status`
+- Retorna `409 Conflict` ao tentar excluir um recurso com histórico de uso vinculado
 
 Exemplo de resposta de `GET /api/recursos.php`:
 ```json
@@ -170,14 +175,15 @@ Exemplo de resposta de `GET /api/recursos.php`:
   "dados": [
     {
       "id": 1,
-      "nome": "Notebook Dell Latitude",
-      "descricao": "Uso do setor de TI",
-      "categoria": { "id": 2, "nome": "Software" },
-      "setor": { "id": 2, "nome": "TI" },
-      "foto": "recurso_65123abc.jpg",
-      "foto_url": "http://seusite.com/uploads/recurso_65123abc.jpg",
-      "criado_em": "2026-06-30 10:00:00",
-      "atualizado_em": "2026-06-30 10:00:00"
+      "nome": "Projetor Epson PowerLite",
+      "descricao": "Projetor multimídia full HD",
+      "categoria": { "id": 1, "nome": "Audiovisual" },
+      "setor": { "id": 1, "nome": "TI" },
+      "status": "Disponível",
+      "localizacao": "Sala de TI",
+      "foto": null,
+      "foto_url": null,
+      "data_cadastro": "2026-07-01"
     }
   ]
 }
@@ -187,39 +193,33 @@ Exemplo de resposta de `GET /api/recursos.php`:
 
 ## Consumindo no Android
 
-Um guia completo (modelos Kotlin, interface Retrofit, exemplo de chamada em
-coroutine e carregamento de imagem com Coil) está em
+Guia completo (modelos Kotlin, interface Retrofit, exemplo de chamada em
+coroutine e carregamento de imagem com Coil) em
 [`api/README.md`](api/README.md#consumindo-no-android-kotlin--retrofit).
 
 Pontos rápidos:
-- **Emulador Android** → use `http://10.0.2.2/...` como base URL (aponta
-  para o `localhost` da sua máquina).
-- **Celular físico na mesma rede** → use o IP local do seu computador
-  (ex.: `http://192.168.0.10/...`).
-- Se a API estiver em HTTP puro (sem SSL) durante testes, adicione
-  `android:usesCleartextTraffic="true"` no `AndroidManifest.xml`.
+- **Emulador Android** → `http://10.0.2.2/...` (aponta para o `localhost` da máquina)
+- **Celular físico na mesma rede** → IP local do computador (ex.: `http://192.168.0.10/...`)
+- Testes em HTTP puro (sem SSL) exigem `android:usesCleartextTraffic="true"` no `AndroidManifest.xml`
 
 ---
 
 ## Segurança e boas práticas aplicadas
 
-- Todas as consultas usam **prepared statements** via PDO (proteção contra
-  SQL Injection)
-- Saída de dados no HTML sempre passa por `htmlspecialchars` (proteção
-  contra XSS), através da função `e()`
-- Upload de imagem valida o **MIME real** do arquivo, não apenas a extensão
+- Todas as consultas usam **prepared statements** via PDO
+- Saída de dados no HTML sempre passa por `htmlspecialchars` (função `e()`)
+- Upload de imagem valida o **MIME real** do arquivo
 - `.htaccess` bloqueia listagem de diretórios
-- Chaves estrangeiras com `ON DELETE SET NULL` evitam exclusões em cascata
-  indesejadas
+- Exclusão de recurso trata a restrição de FK de `historico_uso` de forma
+  amigável (sem tela de erro genérica do banco)
 
 ---
 
 ## Possíveis próximos passos
 
-Caso o projeto cresça, algumas melhorias que fazem sentido adicionar depois:
-
-- Autenticação (login) tanto no CRUD web quanto na API (ex.: token Bearer)
-- Paginação na listagem (web e API)
-- Filtros por categoria/setor na API (`?categoria_id=1`)
-- Campo de busca por nome
-- CRUD próprio para gerenciar categorias e setores pela interface web
+- Autenticação usando a tabela `usuario` já existente no banco (login +
+  controle de acesso por `nivel`)
+- CRUD de reservas propriamente dito, usando `historico_uso` (data início/fim,
+  usuário, turma, finalidade), com verificação de conflito de datas
+- CRUD próprio para gerenciar `categoria` e `setor` pela interface web
+- Paginação e busca por nome na listagem (web e API)
