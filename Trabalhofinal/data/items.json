@@ -1,0 +1,56 @@
+[
+    {
+        "id": 1,
+        "name": "Projetor Multimidia",
+        "category": "Equipamentos",
+        "location": "Sala 201 - Bloco A",
+        "description": "Projetor Epson PowerLite X41+",
+        "status": "Em Uso",
+        "image": null
+    },
+    {
+        "id": 2,
+        "name": "Notebook Dell",
+        "category": "Informatica",
+        "location": "Sala 203 - Bloco A",
+        "description": "Notebook Dell Inspiron 15",
+        "status": "Em Uso",
+        "image": null
+    },
+    {
+        "id": 3,
+        "name": "Caixa de Som",
+        "category": "Audio",
+        "location": "Auditorio",
+        "description": "Caixa de som amplificada",
+        "status": "Disponivel",
+        "image": null
+    },
+    {
+        "id": 4,
+        "name": "Sala 101",
+        "category": "Salas",
+        "location": "Bloco A - 1 Andar",
+        "description": "Sala de aula com capacidade para 30 alunos",
+        "status": "Disponivel",
+        "image": null
+    },
+    {
+        "id": 5,
+        "name": "Laboratorio de Informatica",
+        "category": "Laboratorios",
+        "location": "Bloco B - 2 Andar",
+        "description": "Laboratorio com 20 computadores",
+        "status": "Reservado",
+        "image": null
+    },
+    {
+        "id": 6,
+        "name": "Microfone Sem Fio",
+        "category": "Audio",
+        "location": "Auditorio",
+        "description": "Microfone sem fio profissional",
+        "status": "Em Uso",
+        "image": null
+    }
+]

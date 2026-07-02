@@ -1,0 +1,16 @@
+[
+    {
+        "id": 1,
+        "name": "Administrador",
+        "email": "admin@escola.com",
+        "password": "$2y$10$gfkKtZy5T0JB8VnZGWN55uS3Zpnoy9a.hWkBO1QamleX314PL\/s3S",
+        "role": "admin"
+    },
+    {
+        "id": 2,
+        "name": "Visualizador",
+        "email": "aluno@escola.com",
+        "password": "$2y$10$69zWlXEgVV8K8Ouus4KBWuc29.\/JTZElb8qARgLGAe3E2OgLxie\/q",
+        "role": "viewer"
+    }
+]
